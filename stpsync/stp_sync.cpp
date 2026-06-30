@@ -36,10 +36,10 @@ StpSync::StpSync(DBConnector *db, DBConnector *cfgDb) :
     m_stpVlanInstanceTable(db, APP_STP_VLAN_INSTANCE_TABLE_NAME),
     m_stpPortTable(db, APP_STP_PORT_TABLE_NAME),
     m_stpPortStateTable(db, APP_STP_PORT_STATE_TABLE_NAME),
-    m_stpMstTable(db, APP_STP_MST_INST_TABLE_NAME),
-    m_stpMstPortTable(db, APP_STP_MST_PORT_TABLE_NAME),
+    m_stpMstTable(db, "STP_MST_INST_TABLE"),
+    m_stpMstPortTable(db, "STP_MST_PORT_TABLE"),
     m_stpFastAgeFlushTable(db, APP_STP_FASTAGEING_FLUSH_TABLE_NAME),
-    m_stpInstancePortFlushTable(db, APP_STP_INST_PORT_FLUSH_TABLE_NAME),
+    m_stpInstancePortFlushTable(db, "STP_INST_PORT_FLUSH_TABLE"),
     m_appPortTable(db, APP_PORT_TABLE_NAME),
     m_cfgPortTable(cfgDb, CFG_PORT_TABLE_NAME),
     m_cfgLagTable(cfgDb, CFG_LAG_TABLE_NAME)

@@ -70,8 +70,58 @@ void stpd_log_init()
         STP_LOG_SET_LEVEL(STP_LOG_LEVEL_INFO);
 }
 
+static void generate_fake_bpdu_tick(evutil_socket_t fd, short what, void *arg)
+{
+    int test_rate = (int)(uintptr_t)arg;
+    if (test_rate <= 0) return;
+
+    if (!g_stpd_intf_db) return;
+
+    struct avl_traverser traverser;
+    avl_t_init(&traverser, g_stpd_intf_db);
+    INTERFACE_NODE *intf_node = (INTERFACE_NODE *)avl_t_first(&traverser, g_stpd_intf_db);
+    if (!intf_node) {
+        return;
+    }
+
+    unsigned char pkt[35];
+    memset(pkt, 0, sizeof(pkt));
+    pkt[0] = 0x00;
+    pkt[1] = 0x00;
+    pkt[2] = 0x00;
+    pkt[3] = 0x00;
+    
+    pkt[4] = 0x01; // Topology Change flag = 1
+    
+    pkt[5] = 0x80;
+    pkt[13] = 0x04;
+    pkt[17] = 0x80;
+    
+    pkt[25] = (intf_node->port_id >> 8) & 0xFF;
+    pkt[26] = intf_node->port_id & 0xFF;
+    
+    pkt[29] = 20; 
+    pkt[31] = 2;
+    pkt[33] = 15;
+
+    uint16_t vlan_id = 1;
+
+    if (STP_IS_PROTOCOL_ENABLED(L2_PVSTP)) {
+        stpmgr_process_rx_bpdu(vlan_id, intf_node->port_id, pkt);
+    } else if (STP_IS_PROTOCOL_ENABLED(L2_MSTP)) {
+        mstpmgr_rx_bpdu(vlan_id, intf_node->port_id, pkt, sizeof(pkt));
+    }
+}
+
 int stpd_main()
 {
+    int test_rate = 0;
+    char *env_rate = getenv("STP_TEST_RATE");
+    if (env_rate) {
+        test_rate = atoi(env_rate);
+        STP_LOG_INFO("STP stress test rate set to: %d pps", test_rate);
+    }
+
     int rc = 0;
     struct timeval stp_100ms_tv = {0, STPD_100MS_TIMEOUT};
     struct timeval msec_50 = { 0, 50*1000 };
@@ -153,6 +203,18 @@ int stpd_main()
     }
 
     STP_LOG_INFO("STP Daemon Running");
+
+    if (test_rate > 0) {
+        struct timeval fake_tv;
+        fake_tv.tv_sec = 0;
+        fake_tv.tv_usec = 1000000 / test_rate;
+        
+        struct event *evtimer_fake = stpmgr_libevent_create(g_stpd_evbase, -1, EV_PERSIST, 
+                generate_fake_bpdu_tick, (void *)(uintptr_t)test_rate, &fake_tv);
+        if (!evtimer_fake) {
+            STP_LOG_ERR("Failed to create fake BPDU timer");
+        }
+    }
 
     event_base_dispatch(g_stpd_evbase);
 
