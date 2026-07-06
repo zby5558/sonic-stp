@@ -84,32 +84,28 @@ static void generate_fake_bpdu_tick(evutil_socket_t fd, short what, void *arg)
         return;
     }
 
-    unsigned char pkt[35];
-    memset(pkt, 0, sizeof(pkt));
-    pkt[0] = 0x00;
-    pkt[1] = 0x00;
-    pkt[2] = 0x00;
-    pkt[3] = 0x00;
-    
-    pkt[4] = 0x01; // Topology Change flag = 1
-    
-    pkt[5] = 0x80;
-    pkt[13] = 0x04;
-    pkt[17] = 0x80;
-    
-    pkt[25] = (intf_node->port_id >> 8) & 0xFF;
-    pkt[26] = intf_node->port_id & 0xFF;
-    
-    pkt[29] = 20; 
-    pkt[31] = 2;
-    pkt[33] = 15;
+    STP_CONFIG_BPDU pkt;
+    memset(&pkt, 0, sizeof(pkt));
+
+    pkt.mac_header = g_stp_config_bpdu.mac_header;
+    pkt.llc_header = g_stp_config_bpdu.llc_header;
+    pkt.protocol_id = htons(0);
+    pkt.protocol_version_id = STP_VERSION_ID;
+    pkt.type = CONFIG_BPDU_TYPE;
+    pkt.flags.topology_change = 1;
+    *((UINT16 *)&pkt.port_id) = htons((UINT16)intf_node->port_id);
+
+    pkt.message_age = htons(0);
+    pkt.max_age = htons(STP_DFLT_MAX_AGE << 8);
+    pkt.hello_time = htons(STP_DFLT_HELLO_TIME << 8);
+    pkt.forward_delay = htons(STP_DFLT_FORWARD_DELAY << 8);
 
     uint16_t vlan_id = 1;
 
     if (STP_IS_PROTOCOL_ENABLED(L2_PVSTP)) {
-        stpmgr_process_rx_bpdu(vlan_id, intf_node->port_id, pkt);
+        stpmgr_process_rx_bpdu(vlan_id, intf_node->port_id, (unsigned char *)&pkt);
     } else if (STP_IS_PROTOCOL_ENABLED(L2_MSTP)) {
-        mstpmgr_rx_bpdu(vlan_id, intf_node->port_id, pkt, sizeof(pkt));
+        mstpmgr_rx_bpdu(vlan_id, intf_node->port_id, &pkt, sizeof(pkt));
     }
 }
 
